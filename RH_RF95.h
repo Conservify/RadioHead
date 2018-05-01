@@ -674,6 +674,16 @@ public:
     /// \return true if sleep mode was successfully entered.
     virtual bool    sleep();
 
+    /// Service this Radio instance, handling any pending IRQs that may have
+    /// been raised. By handling raised IRQs outside of the handler we avoid
+    /// issues when dealing with other devices on the SPI bus.
+    bool service();
+
+    /// Set this Radio instance to defer IRQ handling.
+    void setDeferIrqHandling() {
+        _deferIrqHandling = true;
+    }
+
 protected:
     /// This is a low level function to handle the interrupts for one instance of RH_RF95.
     /// Called automatically by isr*()
@@ -711,12 +721,19 @@ private:
 
     /// Number of octets in the buffer
     volatile uint8_t    _bufLen;
-    
+
     /// The receiver/transmitter buffer
     uint8_t             _buf[RH_RF95_MAX_PAYLOAD_LEN];
 
     /// True when there is a valid message in the buffer
     volatile bool       _rxBufValid;
+
+    /// Flag that indicates we should defer handling IRQs until outside of the
+    /// IRQ handler.
+    volatile bool       _deferIrqHandling;
+
+    /// Signals that an IRQ was raised so we know to service that.
+    volatile bool       _irqReady;
 };
 
 /// @example rf95_client.pde

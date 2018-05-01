@@ -30,6 +30,7 @@ RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi
 {
     _interruptPin = interruptPin;
     _myInterruptIndex = 0xff; // Not allocated yet
+    _deferIrqHandling = false;
 }
 
 bool RH_RF95::init()
@@ -117,13 +118,13 @@ bool RH_RF95::init()
     return true;
 }
 
-// C++ level interrupt handler for this instance
-// LORA is unusual in that it has several interrupt lines, and not a single, combined one.
-// On MiniWirelessLoRa, only one of the several interrupt lines (DI0) from the RFM95 is usefuly 
-// connnected to the processor.
-// We use this to get RxDone and TxDone interrupts
-void RH_RF95::handleInterrupt()
-{
+bool RH_RF95::service() {
+    if (!_irqReady) {
+        return false;
+    }
+
+    _irqReady = false;
+
     // Read the interrupt register
     //Serial.println("HandleInterrupt");
     uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
@@ -157,8 +158,24 @@ void RH_RF95::handleInterrupt()
 	_txGood++;
 	setModeIdle();
     }
-    
+
     spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
+
+    return true;
+}
+
+// C++ level interrupt handler for this instance
+// LORA is unusual in that it has several interrupt lines, and not a single, combined one.
+// On MiniWirelessLoRa, only one of the several interrupt lines (DI0) from the RFM95 is usefuly 
+// connnected to the processor.
+// We use this to get RxDone and TxDone interrupts
+void RH_RF95::handleInterrupt()
+{
+    _irqReady = true;
+
+    if (!_deferIrqHandling) {
+        service();
+    }
 }
 
 // These are low level functions that call the interrupt handler for the correct
